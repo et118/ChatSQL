@@ -1,0 +1,9 @@
+services:
+  mariadb:
+    image: mariadb:11.8.5-ubi9
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD=toor
+    ports:
+      - "4000:3306"
+    container_name: mariadb
