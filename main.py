@@ -22,11 +22,10 @@ def overwriteUnaryDataset(cursor, conn):
         """
         CREATE TABLE UnaryDataset (
             KeyToken TEXT NOT NULL,
-            NextToken !!!TEXT NOT NULL,
+            NextToken TEXT NOT NULL,
             Num INTEGER NOT NULL DEFAULT 1
         );
         """)
-
     with open("wikidata.txt", "r") as file:
         lines = file.readlines()
         total = len(lines)
@@ -96,14 +95,14 @@ try:
 
     #sys.exit()
     print("\n")
-    #cursor.execute("SELECT * fFROM UnaryDataset ORDER BY RAND() LIMIT 1")
+    #cursor.execute("SELECT * FROM UnaryDataset ORDER BY RAND() LIMIT 1")
     #completeString = cursor.fetchone()[0]
-    completeString = "Hello"
+    completeString = "I am such a piece"
     lastString = ""
     while True:
         completeString = predictNextWord(cursor, conn, completeString)
         if completeString.endswith("."):
-            cursor.execute("SELECT * SSFROM UnaryDataset ORDER BY RAND() LIMIT 1")
+            cursor.execute("SELECT * FROM UnaryDataset ORDER BY RAND() LIMIT 1")
             completeString += " " + cursor.fetchone()[0]
         elif completeString == lastString:
             completeString += "."
