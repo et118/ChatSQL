@@ -1,6 +1,6 @@
 services:
   mariadb:
-    image: mariadb:11.8.5-ubi9
+    image: docker.io/library/mariadb:11.8.5-ubi9
     restart: always
     environment:
       MARIADB_ROOT_PASSWORD=toor
