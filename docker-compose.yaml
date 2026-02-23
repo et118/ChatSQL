@@ -1,9 +1,21 @@
 services:
+  app:
+    image: chatsql_app
+    build:
+      context: .
+    volumes:
+      - ./src:/app/src
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+    container_name: chatsql_app
   mariadb:
-    image: docker.io/library/mariadb:11.8.5-ubi9
+    image: docker.io/library/mysql:9.6.0
     restart: always
     environment:
-      MARIADB_ROOT_PASSWORD=toor
+      MYSQL_ROOT_PASSWORD=toor
     ports:
       - "4000:3306"
-    container_name: mariadb
+    container_name: mysql
