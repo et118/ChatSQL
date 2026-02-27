@@ -11,11 +11,9 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=true
     container_name: chatsql_app
-  mariadb:
+  mysql:
     image: docker.io/library/mysql:9.6.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD=toor
-    ports:
-      - "4000:3306"
     container_name: mysql
