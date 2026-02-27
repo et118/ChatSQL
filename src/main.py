@@ -5,6 +5,8 @@ import DBManager
 import secrets
 import re
 
+#TODO make sure session cookies get cleared automatically periodically when they expire
+
 DBManager.block_until_connected()
 DBManager.rebuild_if_not_initialized() #initialize all new data and setup tables if we are in a new setup
 
@@ -54,6 +56,13 @@ def login():
         return redirect("/")
     else:
         return "Invalid login credentials. Try another password or username", 401
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    #For now we just do a simple dirty trick and remove the session cookies
+    #TODO remove the current session cookie from the database as well
+    session.clear()
+    return redirect("/")
 
 @app.route("/signup", methods=["POST"])
 def signup():

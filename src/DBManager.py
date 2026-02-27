@@ -64,7 +64,6 @@ def is_auth_token_valid(auth_token, username):
     AND u.username = %s
     AND s.expiry_date > NOW()
     """, (HashManager.hash_auth_token(auth_token), username))
-
     return cursor.fetchone() is not None 
 
 def login(username, password):
