@@ -21,6 +21,17 @@ email_pattern = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
 def index():
     return render_template("index.html")
 
+@app.before_request
+def expire_session_check():
+    #Check for malformed session cookies. Like only having one of the two
+    if ("username" in session and "auth_token" not in session) or \
+       ("auth_token" in session and "username" not in session):
+        session.clear()
+        return
+    #Check if auth_token is alive. If not, clear all session cookies. Note: This queries the database for every request to check if token is still alive. Might not be good for production.
+    if "auth_token" in session and "username" in session and not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
+        session.clear()
+        return
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -53,7 +64,7 @@ def signup():
     username = request.form["username"]
     email = request.form["email"]
     password = request.form["password"]
-    
+
     #Check requirements for username, email, password
     if len(username) > 20:
         return "Username too long. Cant be longer than 20 characters", 400
