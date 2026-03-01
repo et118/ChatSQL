@@ -3,79 +3,7 @@
     <head>
         <meta charset="utf-8">
         <link rel="stylesheet" href="styles/index.css">
-        <script>
-            function show_login_popup(status_message = "") {
-                document.getElementById('login_form').style.visibility='visible';
-                document.getElementById('login_form').style.pointerEvents='auto';
-                document.getElementById('overlay_blur').style.visibility='visible';
-                document.getElementById('overlay_blur').style.pointerEvents='auto';
-                document.getElementById('login_status').innerText = status_message;
-            }
-
-            function show_signup_popup(status_message = "") {
-                document.getElementById('signup_form').style.visibility='visible';
-                document.getElementById('signup_form').style.pointerEvents='auto';
-                document.getElementById('overlay_blur').style.visibility='visible';
-                document.getElementById('overlay_blur').style.pointerEvents='auto';
-                document.getElementById('signup_status').innerText = status_message;
-            }
-
-            function close_popups() {
-                document.getElementById('login_form').style.visibility='hidden';
-                document.getElementById('login_form').style.pointerEvents='none';
-                document.getElementById('signup_form').style.visibility='hidden';
-                document.getElementById('signup_form').style.pointerEvents='none';
-                document.getElementById('overlay_blur').style.visibility='hidden';
-                document.getElementById('overlay_blur').style.pointerEvents='none';
-            }
-
-            document.addEventListener("DOMContentLoaded", function() {
-                const url_params = new URLSearchParams(window.location.search);
-                const status_value = url_params.get("s");
-                console.log(status_value);
-                if (!(status_value === null || status_value === "")) {
-                    let status_message = "";
-                    switch(status_value) {
-                        case "0":
-                            status_message = "Invalid password or username. Please try again";
-                            break;
-                        case "1":
-                            status_message = "Username too long. Can't be longer than 20 characters";
-                            break;
-                        case "2":
-                            status_message = "Username too short. Can't be shorter than 5 characters";
-                            break;
-                        case "3":
-                            status_message = "Username contains invalid characters";
-                            break;
-                        case "4":
-                            status_message = "Email is too long. Can't be longer than 254 characters";
-                            break;
-                        case "5":
-                            status_message = "Invalid email formatting";
-                            break;
-                        case "6":
-                            status_message = "Password too long. Can't be longer than 128 characters";
-                            break;
-                        case "7":
-                            status_message = "Password too short. Can't be shorter than 8 characters";
-                            break;
-                        case "8":
-                            status_message = "Username already exists. Please use another username";
-                            break;
-                    }
-                    if(status_value == "0") {
-                        show_login_popup(status_message);
-                    } else {
-                        show_signup_popup(status_message);
-                    }
-                    url_params.delete("s");
-                    const url = new URL(window.location.href);
-                    url.search = url_params.toString();
-                    window.history.replaceState({}, "", url);
-                }
-            });
-        </script>
+        <script src="scripts/index.js"></script>
     </head>
     <body>
         <aside>
@@ -159,7 +87,34 @@
                 <input class="submit_button" type="submit" value="Continue">
             </form>
             <div id="chat">
-
+                <div id="messages">
+                </div>
+                <div id="question_bar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.335 16.5v-5.835H3.5a.665.665 0 1 1 0-1.33h5.835V3.5a.665.665 0 0 1 1.33 0v5.835H16.5l.134.014a.665.665 0 0 1 0 1.302l-.134.014h-5.835V16.5a.665.665 0 1 1-1.33 0"/></svg>
+                    <input id="query" type="text" placeholder="Ask anything">
+                    <!-- Once again a security vulnerability i dont have time to patch. never let stuff like this be client side normally.-->
+                    {% if 'username' in session %}
+                    <svg xmlns="http://www.w3.org/2000/svg" onclick="start_query()" viewBox="0 0 20 20"><path d="M9 16V6.414L5.707 9.707a1 1 0 1 1-1.414-1.414l5-5 .076-.068a1 1 0 0 1 1.338.068l5 5 .068.076a1 1 0 0 1-1.406 1.406l-.076-.068L11 6.414V16a1 1 0 1 1-2 0"/></svg>
+                    <script>
+                        document.getElementById("query").addEventListener("keydown", (event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                start_query();
+                            }
+                        });
+                    </script>
+                    {% else %}
+                    <svg xmlns="http://www.w3.org/2000/svg" onclick="show_login_popup()" viewBox="0 0 20 20"><path d="M9 16V6.414L5.707 9.707a1 1 0 1 1-1.414-1.414l5-5 .076-.068a1 1 0 0 1 1.338.068l5 5 .068.076a1 1 0 0 1-1.406 1.406l-.076-.068L11 6.414V16a1 1 0 1 1-2 0"/></svg>
+                    <script>
+                        document.getElementById("query").addEventListener("keydown", (event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                show_login_popup();
+                            }
+                        });
+                    </script>
+                    {% endif %}
+                    </div>
             </div>
         </main>
     </body>

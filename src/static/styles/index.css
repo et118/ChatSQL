@@ -317,3 +317,88 @@ main {
 .popup > .submit_button:hover {
     background-color: #fffffff0;
 }
+
+#chat {
+    height:calc(100% - 50px);
+    width:100%;
+}
+
+#messages {
+    height:calc(100% - 70px);
+    width:100%;
+    overflow: auto;
+    scrollbar-color: #9f9f9f #2c2c2c;
+}
+
+#question_bar {
+    width: 80%;
+    height:50px;
+    margin-left: auto;
+    margin-right: auto;
+
+    border-radius: 38px;
+
+    background-color: #303030;
+}
+
+#question_bar > svg {
+    width:20px;
+    height:20px;
+    fill:white;
+    padding: 0;
+    margin: 0;
+    margin-top:5px;
+    margin-bottom:5px;
+    margin-left:10px;
+    padding: 10px 10px 10px 10px;
+    float:left;
+    cursor:pointer;
+}
+
+#question_bar > svg:hover {
+    background-color: #8383835F;
+    border-radius: 38px;
+}
+
+#question_bar > input {
+    width: calc(100% - 120px);
+    color:white;
+    background-color: #00000000;
+    border:none;
+    font-family:inherit;
+    font-size: 16px;
+    height:90%;
+    margin-top:auto;
+    margin-bottom:auto;
+    outline:none;
+    float:left;
+}
+
+.message {
+    width:calc(100% - 20px);
+    color:white;
+    margin-top:10px;
+    margin-bottom: 10px;
+    margin-right:10px;
+    margin-left:10px;
+}
+
+.message > p {
+    overflow-wrap: break-word;
+    font-family: inherit;
+    font-size:16px;
+    margin:0;
+    padding: 10px 15px 10px 15px;
+    border-radius: 20px;
+    width:fit-content;
+}
+
+.bot > p {
+    background-color: #00000000;
+    margin-left:0px;
+}
+
+.user > p {
+    background-color: #323232d9;
+    margin-left:auto;
+}

@@ -1,4 +1,4 @@
-from flask import Flask, redirect, session, render_template, request
+from flask import Flask, redirect, session, render_template, request, Response
 from flask_restx import Api
 from time import sleep
 import DBManager
@@ -31,6 +31,8 @@ def expire_session_check():
         session.clear()
         return
     #Check if auth_token is alive. If not, clear all session cookies. Note: This queries the database for every request to check if token is still alive. Might not be good for production.
+    print("BEFORE REQUEST")
+    print(session)
     if "auth_token" in session and "username" in session and not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
         session.clear()
         return
@@ -94,14 +96,35 @@ def signup():
     if len(password) < 8:
         return redirect("/?s=7")#Password too short. Cant be shorter than 8 characters
     
+    print("FORM ", request.form)
+
     success, auth_token = DBManager.signup(username, email, password)
     if success: #Login automatically if signup successful
         session.clear()
+        print("SETTING AUTH TOKEN TO ",auth_token)
+        print("SETTING USERNAME TO ",username)
         session["auth_token"] = auth_token
         session["username"] = username
         return redirect("/")
     else:
         return redirect("/?s=8")#Username already exists
 
+
+# The streaming done here works, but i wouldn't trust it with multiple users at once. No time for it though. It works for demonstration atleast.
+@app.route("/query", methods=["GET", "POST"])
+def query():
+    if request.method == "POST":
+        data = request.get_json()
+        query = data.get("query", "Default")
+        print("QUERY: ", query)
+        return "OK", 200
+
+    def temp():
+        for i in range(10):
+            yield f"data: {i}\n\n"
+            sleep(1)
+        yield "data: [DONE]\n\n"
+    return Response(temp(), mimetype="text/event-stream")
+
 if __name__ == "__main__": #Only gets run when manually running the python file outside the container
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)

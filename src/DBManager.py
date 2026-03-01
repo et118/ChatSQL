@@ -7,28 +7,28 @@ connection = None
 cursor = None
 def block_until_connected():
     global connection 
-    global cursor #Not the best practice, but it works for this enclosed module
     while True:
         try:
             connection = mysql.connector.connect(
                 host="mysql",
                 user="root",
                 password="toor", #Hardcoded for now
+                use_ssl=False
             )
             if(connection.is_connected()):
                 cursor = connection.cursor()
                 cursor.execute("CREATE DATABASE IF NOT EXISTS chatsql")
                 cursor.execute("USE chatsql")
                 print("Connected to MySQL database")
+                cursor.close()
                 break
         except mysql.connector.Error:
             print("Waiting for database")
             time.sleep(1)
 
 def rebuild_if_not_initialized():
-    global cursor
     global connection
-
+    cursor = connection.cursor()
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Users (
         user_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
@@ -49,10 +49,12 @@ def rebuild_if_not_initialized():
     )
     """)
     connection.commit()
+    cursor.close()
 
 def is_auth_token_valid(auth_token, username):
-    global cursor
     global connection
+    cursor = connection.cursor()
+    print(("DBMANAGER: " + auth_token + " " + username).split(" "))
 
     cursor.execute("""
     SELECT 1 FROM Sessions s
@@ -62,25 +64,25 @@ def is_auth_token_valid(auth_token, username):
     AND s.expiry_date > NOW()
     """, (HashManager.hash_auth_token(auth_token), username))
     valid = cursor.fetchone() is not None
-    
+    cursor.close()
     if not valid: #Remove expired tokens from database, to not clutter the table
         invalidate_auth_token(auth_token, username)
     return valid
 
 def invalidate_auth_token(auth_token, username):
-    global cursor
     global connection
+    cursor = connection.cursor()
     cursor.execute("""
-    DELETE FROM Sessions
-    WHERE (SELECT user_id FROM Users WHERE username = %s)
-    AND auth_token_hash = %s
+    DELETE s FROM Sessions s
+    INNER JOIN Users u ON s.user_id = u.user_id
+    WHERE u.username = %s AND s.auth_token_hash = %s
     """, (username, HashManager.hash_auth_token(auth_token)))
     connection.commit()
+    cursor.close()
 
 def login(username, password):
-    global cursor
     global connection
-
+    cursor = connection.cursor()
     cursor.execute("""
     SELECT password_hash FROM Users
     WHERE username = %s
@@ -101,13 +103,15 @@ def login(username, password):
         """, (username, HashManager.hash_auth_token(auth_token)))
 
         connection.commit()
+        cursor.close()
         return True, auth_token
     else:
+        cursor.close()
         return False, None
 
 def signup(username, email, password):
-    global cursor
     global connection
+    cursor = connection.cursor()
 
     cursor.execute("""
     SELECT 1 FROM Users
@@ -118,6 +122,8 @@ def signup(username, email, password):
         INSERT INTO Users (username, email, password_hash) VALUES (%s,%s,%s)
         """, (username, email, HashManager.hash_password(password)))
         connection.commit()
+        cursor.close()
         return login(username, password)
     else:
+        cursor.close()
         return False, None
