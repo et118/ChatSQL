@@ -31,8 +31,6 @@ def expire_session_check():
         session.clear()
         return
     #Check if auth_token is alive. If not, clear all session cookies. Note: This queries the database for every request to check if token is still alive. Might not be good for production.
-    print("BEFORE REQUEST")
-    print(session)
     if "auth_token" in session and "username" in session and not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
         session.clear()
         return
@@ -95,14 +93,10 @@ def signup():
         return redirect("/?s=6")#Password too long. Cant be longer t han 128 characters
     if len(password) < 8:
         return redirect("/?s=7")#Password too short. Cant be shorter than 8 characters
-    
-    print("FORM ", request.form)
 
     success, auth_token = DBManager.signup(username, email, password)
     if success: #Login automatically if signup successful
         session.clear()
-        print("SETTING AUTH TOKEN TO ",auth_token)
-        print("SETTING USERNAME TO ",username)
         session["auth_token"] = auth_token
         session["username"] = username
         return redirect("/")
@@ -113,6 +107,11 @@ def signup():
 # The streaming done here works, but i wouldn't trust it with multiple users at once. No time for it though. It works for demonstration atleast.
 @app.route("/query", methods=["GET", "POST"])
 def query():
+    if "auth_token" not in session or "username" not in session:
+        return "Missing auth_token and/or username header", 400
+    if not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
+        return "Invalid session", 400
+
     if request.method == "POST":
         data = request.get_json()
         query = data.get("query", "Default")
