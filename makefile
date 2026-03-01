@@ -3,4 +3,6 @@ run:
 	$(DOCKER_CMD) compose -f docker-compose.yaml -p chatsql up
 
 clean:
+	$(DOCKER_CMD) compose -f docker-compose.yaml down -v
 	$(DOCKER_CMD) rmi -f mysql chatsql_app
+

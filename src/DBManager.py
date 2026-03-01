@@ -24,11 +24,6 @@ def block_until_connected():
         except mysql.connector.Error:
             print("Waiting for database")
             time.sleep(1)
-    #cursor.execute("SELECT * FROM Users")
-    #print(cursor.fetchall())
-    #cursor.execute("DELETE FROM Users")
-    #connection.commit()
-
 
 def rebuild_if_not_initialized():
     global cursor
@@ -57,6 +52,8 @@ def rebuild_if_not_initialized():
 
 def is_auth_token_valid(auth_token, username):
     global cursor
+    global connection
+
     cursor.execute("""
     SELECT 1 FROM Sessions s
     INNER JOIN Users u ON s.user_id = u.user_id
@@ -64,18 +61,32 @@ def is_auth_token_valid(auth_token, username):
     AND u.username = %s
     AND s.expiry_date > NOW()
     """, (HashManager.hash_auth_token(auth_token), username))
-    return cursor.fetchone() is not None 
+    valid = cursor.fetchone() is not None
+    
+    if not valid: #Remove expired tokens from database, to not clutter the table
+        invalidate_auth_token(auth_token, username)
+    return valid
+
+def invalidate_auth_token(auth_token, username):
+    global cursor
+    global connection
+    cursor.execute("""
+    DELETE FROM Sessions
+    WHERE (SELECT user_id FROM Users WHERE username = %s)
+    AND auth_token_hash = %s
+    """, (username, HashManager.hash_auth_token(auth_token)))
+    connection.commit()
 
 def login(username, password):
     global cursor
     global connection
-    print(username)
-    print(password)
+
     cursor.execute("""
     SELECT password_hash FROM Users
     WHERE username = %s
     """, (username,))
     password_hash = cursor.fetchone()
+
     if password_hash and HashManager.verify_hashed_password(password, password_hash[0]):
         auth_token = secrets.token_hex(32) #32 bytes, but 64 hex characters long
 
@@ -97,11 +108,11 @@ def login(username, password):
 def signup(username, email, password):
     global cursor
     global connection
+
     cursor.execute("""
     SELECT 1 FROM Users
     WHERE username = %s
     """, (username,))
-    
     if cursor.fetchone() is None: #If account with signup username does not exist, its valid, since we need unique usernames
         cursor.execute("""
         INSERT INTO Users (username, email, password_hash) VALUES (%s,%s,%s)
