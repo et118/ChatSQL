@@ -118,4 +118,4 @@ def query():
     return Response(ChatManager.predict_next_words(query), mimetype="text/event-stream")
 
 if __name__ == "__main__": #Only gets run when manually running the python file outside the container
-    app.run(debug=True, threaded=True)
+    app.run(debug=True, threaded=True, port=5000, host="0.0.0.0")

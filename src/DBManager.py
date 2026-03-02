@@ -18,6 +18,7 @@ def block_until_connected():
                 temp_cursor = temp_connection.cursor()
                 temp_cursor.execute("CREATE DATABASE IF NOT EXISTS chatsql")
                 temp_cursor.execute("USE chatsql")
+                temp_cursor.execute("SET GLOBAL innodb_buffer_pool_size = 4000000000")
                 print("Connected to MySQL database")
                 temp_cursor.close()
                 temp_connection.close()
@@ -131,12 +132,15 @@ def rebuild_if_not_initialized():
         END;
         """)
 
+        #cursor.execute("SELECT COUNT(*) FROM WordData")
+        #cursor.fetchall()
+
 def is_word_data_initialized():
     with get_db_cursor() as cursor:
         cursor.execute("""SHOW TABLES LIKE %s""", ("WordData",))
         return cursor.fetchone() is not None
 
-def overwrite_word_data_table(rows):
+def clear_word_data_table():
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("CALL drop_index_if_exists('WordData', 'index_keyword_cumulative_weight')")
         cursor.execute("DROP TABLE IF EXISTS WordData")
@@ -155,6 +159,9 @@ def overwrite_word_data_table(rows):
         CREATE INDEX index_keyword_cumulative_weight ON WordData(keyword, cumulative_weight);
         """)#We use an index to order the items for faster querying, since its a cumulative weight for choosing a specific word
         
+
+def add_word_data_rows(rows):
+    with get_db_cursor(commit=True) as cursor:
         #i dont know why, but i had to add IGNORE because it said some of the input data was duplicated
         #but it really wasnt. I checked in numerous ways, so i decided to just ignore if something goes wrong.
         #at most we lose a couple words.

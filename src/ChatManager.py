@@ -1,26 +1,29 @@
 import DBManager
 import random
+import time
 
 # https://github.com/pgcorpus/gutenberg/
 def predict_next_words(query):
-    max_num_sentences = 100
+    max_num_sentences = 40
     split_row_chance = 40
     current_num_sentences = 0
     new_sentence = " " + query
-    while random.randint(1,max_num_sentences) > current_num_sentences:
-        while True:
-            word = DBManager.predict_next_word(new_sentence.split(" ")[-1])
-            if word is None:
-                continue
-            word = word.strip()
-            if word and word.endswith("."):
-                current_num_sentences += 1
-                if random.randint(1,100) < split_row_chance:
-                    word += "<br>"
-            new_sentence += " " + word
-            yield f"data: {" " + word}\n\n"
-            if word and word.endswith("."):
-                break
+    hit_dot = False
+    while True:
+        if hit_dot == True:
+            break
+        word = DBManager.predict_next_word(new_sentence.split(" ")[-1])
+        if word is None:
+            continue
+        word = word.strip()
+        if word.endswith("."):
+            current_num_sentences += 1
+            if random.randint(1,100) < split_row_chance:
+                word += "<br>"
+            if random.randint(1,max_num_sentences) < current_num_sentences:
+                hit_dot = True
+        new_sentence += " " + word
+        yield f"data: {' ' + word}\n\n"
     yield "data: [DONE]\n\n"
 
 def train_if_not_initialized():
@@ -75,6 +78,14 @@ def train_if_not_initialized():
 
     print("Total rows:", len(trained_rows))
     print("Unique pairs:", len(set((r[0], r[1]) for r in trained_rows)))
-    print("Overwriting with new data")
-    DBManager.overwrite_word_data_table(trained_rows)
-    print("Done")
+    print("Clearing word data table")
+    DBManager.clear_word_data_table()
+    print("Inserting new data")
+    length = len(trained_rows)
+    max_chunksize = 100000
+    for i in range(0, length, max_chunksize):
+        print(f"Chunk {int(i/max_chunksize)}/{int(length / max_chunksize)}")
+        batch = trained_rows[i:i + max_chunksize]
+        DBManager.add_word_data_rows(batch)
+    print("All done")
+    
