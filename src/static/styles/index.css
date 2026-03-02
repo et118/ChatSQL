@@ -375,12 +375,12 @@ main {
 }
 
 .message {
-    width:calc(100% - 20px);
+    width:calc(60% - 20px);
+    margin-left:20%;
+    margin-right:20%;
     color:white;
     margin-top:10px;
     margin-bottom: 10px;
-    margin-right:10px;
-    margin-left:10px;
 }
 
 .message > p {
@@ -391,6 +391,7 @@ main {
     padding: 10px 15px 10px 15px;
     border-radius: 20px;
     width:fit-content;
+    line-height: 1.5;
 }
 
 .bot > p {

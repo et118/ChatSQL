@@ -2,6 +2,7 @@ from flask import Flask, redirect, session, render_template, request, Response
 from flask_restx import Api
 from time import sleep
 import DBManager
+import ChatManager
 import secrets
 import re
 
@@ -9,6 +10,7 @@ import re
 
 DBManager.block_until_connected()
 DBManager.rebuild_if_not_initialized() #initialize all new data and setup tables if we are in a new setup
+ChatManager.train_if_not_initialized()
 
 app = Flask(__name__, static_url_path="", static_folder="./static")
 # Hardcoded and not so secret secret key, since we aren't in production
@@ -105,25 +107,15 @@ def signup():
 
 
 # The streaming done here works, but i wouldn't trust it with multiple users at once. No time for it though. It works for demonstration atleast.
-@app.route("/query", methods=["GET", "POST"])
+@app.route("/query", methods=["GET"])
 def query():
     if "auth_token" not in session or "username" not in session:
         return "Missing auth_token and/or username header", 400
     if not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
         return "Invalid session", 400
 
-    if request.method == "POST":
-        data = request.get_json()
-        query = data.get("query", "Default")
-        print("QUERY: ", query)
-        return "OK", 200
-
-    def temp():
-        for i in range(10):
-            yield f"data: {i}\n\n"
-            sleep(1)
-        yield "data: [DONE]\n\n"
-    return Response(temp(), mimetype="text/event-stream")
+    query = request.args.get("q", "")
+    return Response(ChatManager.predict_next_words(query), mimetype="text/event-stream")
 
 if __name__ == "__main__": #Only gets run when manually running the python file outside the container
     app.run(debug=True, threaded=True)

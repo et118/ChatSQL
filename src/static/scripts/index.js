@@ -91,23 +91,24 @@ function start_query() { //Not nicely done. Probably a lot of security vulnerabi
     let bot_message = document.createElement("p");
     bot_message_div.appendChild(bot_message);
 
-    const source = new EventSource("/query");
+    
+    const source = new EventSource("/query?q=" + encodeURIComponent(query.value));
 
-    fetch("/query", {
+    /*fetch("/query", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({query: query.value})
-    });
+    });*/
 
     query.value = "";
-
     source.onmessage = (event) => {
         if(event.data === "[DONE]") {
             source.close();
             is_query_running = false;
         } else {
             current_result += event.data;
-            bot_message.innerText += event.data;
+            bot_message.innerHTML += event.data;
+            document.getElementById("messages").scrollTo({top: document.getElementById("messages").scrollHeight, behavior: 'smooth'})
         }
     }
 }

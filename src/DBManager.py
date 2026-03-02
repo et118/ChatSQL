@@ -24,7 +24,7 @@ def block_until_connected():
 
                 db_pool = mysql.connector.pooling.MySQLConnectionPool(
                     pool_name="chatsql",
-                    pool_size=5,
+                    pool_size=10,
                     host="mysql",
                     user="root",
                     password="toor",
@@ -72,6 +72,101 @@ def rebuild_if_not_initialized():
             PRIMARY KEY (user_id, auth_token_hash)
         )
         """)
+
+        #Creating my own DROP INDEX IF NOT EXISTS because apparently it doesnt work in mysql
+        #By https://overflow.adminforge.de/questions/39849002/how-to-make-drop-index-if-exists-for-mysql
+        cursor.execute("DROP PROCEDURE IF EXISTS drop_index_if_exists;")
+        cursor.execute("""
+        CREATE PROCEDURE drop_index_if_exists(IN tab_name VARCHAR(64), IN ind_name VARCHAR(64))
+        BEGIN
+            SET @tableName = tab_name;
+            SET @indexName = ind_name;
+            SET @indexExists = 0;
+            
+            SELECT 1 INTO @indexExists
+            FROM information_schema.statistics
+            WHERE TABLE_NAME = @tableName
+            AND INDEX_NAME = @indexName;
+
+            SET @query = CONCAT('DROP INDEX ', @indexName, ' ON ', @tableName);
+            IF @indexExists THEN
+                PREPARE stmt FROM @query;
+                EXECUTE stmt;
+                DEALLOCATE PREPARE stmt;
+            END IF;
+        END;
+        """)
+
+        #The function used to query the next word
+        cursor.execute("DROP FUNCTION IF EXISTS get_next_word;")
+        cursor.execute("""
+        CREATE FUNCTION get_next_word(input_word VARCHAR(64)) RETURNS VARCHAR(64)
+        DETERMINISTIC
+        BEGIN
+            DECLARE random_weight INT;
+            DECLARE output_word VARCHAR(64);
+            
+            SELECT FLOOR(RAND() * total_weight)
+                INTO random_weight
+                FROM WordData
+                WHERE keyword = BINARY input_word
+                LIMIT 1;
+
+            IF random_weight IS NULL THEN
+                SELECT predict_word
+                    INTO output_word
+                    FROM WordData
+                    ORDER BY RAND()
+                    LIMIT 1;
+            ELSE
+                SELECT predict_word
+                    INTO output_word
+                    FROM WordData
+                    WHERE keyword = BINARY input_word
+                    AND cumulative_weight >= random_weight
+                    ORDER BY cumulative_weight ASC
+                    LIMIT 1;
+            END IF;
+            RETURN output_word;
+        END;
+        """)
+
+def is_word_data_initialized():
+    with get_db_cursor() as cursor:
+        cursor.execute("""SHOW TABLES LIKE %s""", ("WordData",))
+        return cursor.fetchone() is not None
+
+def overwrite_word_data_table(rows):
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("CALL drop_index_if_exists('WordData', 'index_keyword_cumulative_weight')")
+        cursor.execute("DROP TABLE IF EXISTS WordData")
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS WordData (
+            keyword VARCHAR(255) NOT NULL,
+            predict_word VARCHAR(255) NOT NULL,
+            count INT NOT NULL,
+            cumulative_weight INT NOT NULL,
+            total_weight INT NOT NULL,
+            PRIMARY KEY (keyword, predict_word)
+        );""")
+
+        cursor.execute("""
+        CREATE INDEX index_keyword_cumulative_weight ON WordData(keyword, cumulative_weight);
+        """)#We use an index to order the items for faster querying, since its a cumulative weight for choosing a specific word
+        
+        #i dont know why, but i had to add IGNORE because it said some of the input data was duplicated
+        #but it really wasnt. I checked in numerous ways, so i decided to just ignore if something goes wrong.
+        #at most we lose a couple words.
+        cursor.executemany("""
+        INSERT IGNORE INTO WordData (keyword, predict_word, count, cumulative_weight, total_weight) 
+        VALUES (%s, %s, %s, %s, %s)
+        """, rows)
+
+def predict_next_word(word):
+    with get_db_cursor() as cursor:
+        cursor.execute("SELECT get_next_word(%s) LIMIT 1", (word,))
+        return cursor.fetchone()[0]
 
 def is_auth_token_valid(auth_token, username):
     with get_db_cursor() as cursor:
