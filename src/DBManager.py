@@ -98,7 +98,7 @@ def rebuild_if_not_initialized():
         END;
         """)
 
-        #The function used to query the next word
+        #The function used to query the next word. i had to add BINARY to make the word comparison include capitalized characters
         cursor.execute("DROP FUNCTION IF EXISTS get_next_word;")
         cursor.execute("""
         CREATE FUNCTION get_next_word(input_word VARCHAR(64)) RETURNS VARCHAR(64)
@@ -132,8 +132,11 @@ def rebuild_if_not_initialized():
         END;
         """)
 
-        #cursor.execute("SELECT COUNT(*) FROM WordData")
-        #cursor.fetchall()
+        #cursor.execute("""
+        #SELECT predict_word FROM WordData
+        #WHERE predict_word NOT IN (SELECT DISTINCT keyword FROM WordData)
+        #""")
+        #print(cursor.fetchall())
 
 def is_word_data_initialized():
     with get_db_cursor() as cursor:

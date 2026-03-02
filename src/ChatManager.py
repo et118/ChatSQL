@@ -4,7 +4,7 @@ import time
 
 # https://github.com/pgcorpus/gutenberg/
 def predict_next_words(query):
-    max_num_sentences = 40
+    max_num_sentences = 1
     split_row_chance = 40
     current_num_sentences = 0
     new_sentence = " " + query
@@ -12,18 +12,24 @@ def predict_next_words(query):
     while True:
         if hit_dot == True:
             break
+        start = time.perf_counter()
         word = DBManager.predict_next_word(new_sentence.split(" ")[-1])
+        end = time.perf_counter()
+        if (end - start) * 1000 > 100:
+            print(new_sentence.split(" ")[-1])
         if word is None:
             continue
         word = word.strip()
+        breakline = ""
         if word.endswith("."):
             current_num_sentences += 1
             if random.randint(1,100) < split_row_chance:
-                word += "<br>"
+                breakline = "<br>"
             if random.randint(1,max_num_sentences) < current_num_sentences:
                 hit_dot = True
         new_sentence += " " + word
-        yield f"data: {' ' + word}\n\n"
+        yield f"data: {' ' + word + breakline}\n\n"
+        time.sleep(0.01)
     yield "data: [DONE]\n\n"
 
 def train_if_not_initialized():
@@ -35,6 +41,7 @@ def train_if_not_initialized():
     #Start "training" by reading sentences.txt and organizing them into word pairs.
     #Group them together based on the first word, what i call a "KeyWord"
     with open("sentences.txt", "r") as file:
+        saved_word = ""
         for i, line in enumerate(file):
             if i % 1000 == 0:
                 print(f"{i} processed")
@@ -43,9 +50,19 @@ def train_if_not_initialized():
             if len(words) < 2:
                 continue
 
-            for j in range(len(words) - 1):
-                first_word = words[j]
+            minimum = 0
+            if saved_word != "":
+                minimum = -1
+            for j in range(minimum, len(words) - 1):
+                if j == -1:
+                    first_word = saved_word
+                    saved_word = ""
+                else:
+                    first_word = words[j]
                 second_word = words[j+1]
+                if j == len(words) - 2:
+                    saved_word = second_word
+
                 if first_word == "" or second_word == "":
                     continue
                 
@@ -55,29 +72,41 @@ def train_if_not_initialized():
                 if second_word not in grouped_dictionary[first_word]:
                     grouped_dictionary[first_word][second_word] = 0
                 
+                
+                
                 grouped_dictionary[first_word][second_word] += 1
+
+    
 
     #And now calculating cumulative weight
     trained_rows = []
     i = 0
     total = len(grouped_dictionary.items())
+    valid_keywords = set(grouped_dictionary.keys())
     for keyword, word_dict in grouped_dictionary.items():
-        #print(f"{i}/{total} finalized")
         i += 1
-        word_items = list(word_dict.items())
-        word_items.sort(key=lambda x: x[0]) #sort by the word
+
+        #Remove predictions that dont have a keyword, since they slow down the search a LOT by searching through entire database.
+        filtered_items = []
+        for word, count in word_dict.items():
+            if word in valid_keywords:
+                filtered_items.append((word, count))
+
+        if len(filtered_items) == 0:
+            continue
+
+        filtered_items.sort(key=lambda x: x[0]) #sort by the word
 
         total_weight = 0
-        for _, count in word_items:
+        for _, count in filtered_items:
             total_weight += count
         
         cumulative_weight = 0
-        for word, count in word_items:
+        for word, count in filtered_items:
             cumulative_weight += count
             trained_rows.append((keyword, word, count, cumulative_weight, total_weight))
 
     print("Total rows:", len(trained_rows))
-    print("Unique pairs:", len(set((r[0], r[1]) for r in trained_rows)))
     print("Clearing word data table")
     DBManager.clear_word_data_table()
     print("Inserting new data")
