@@ -63,6 +63,12 @@ def rebuild_if_not_initialized():
         )
         """)
 
+        #Creating the bot user. Ignore if already exists
+        cursor.execute("""
+        INSERT IGNORE INTO Users (user_id, username, email, password_hash)
+        VALUES (1, 'ChatSQL', '', '')
+        """)
+
         #For a "real" application it should store IP, Login date, etc. for logs and to prevent fraud
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS Sessions (
@@ -74,8 +80,29 @@ def rebuild_if_not_initialized():
         )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Chats (
+            chat_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+            user_id INT NOT NULL,
+            creation_date DATETIME NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Message (
+            message_id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+            chat_id INT NOT NULL,
+            sender_id INT NOT NULL,
+            message TEXT NOT NULL,
+            creation_date DATETIME NOT NULL,
+            FOREIGN KEY (sender_id) REFERENCES Users(user_id),
+            FOREIGN KEY (chat_id) REFERENCES Chats(chat_id)
+        )
+        """)
+
         #Creating my own DROP INDEX IF NOT EXISTS because apparently it doesnt work in mysql
-        #By https://overflow.adminforge.de/questions/39849002/how-to-make-drop-index-if-exists-for-mysql
+        #Credit to https://overflow.adminforge.de/questions/39849002/how-to-make-drop-index-if-exists-for-mysql
         cursor.execute("DROP PROCEDURE IF EXISTS drop_index_if_exists;")
         cursor.execute("""
         CREATE PROCEDURE drop_index_if_exists(IN tab_name VARCHAR(64), IN ind_name VARCHAR(64))
@@ -132,10 +159,7 @@ def rebuild_if_not_initialized():
         END;
         """)
 
-        #cursor.execute("""
-        #SELECT predict_word FROM WordData
-        #WHERE predict_word NOT IN (SELECT DISTINCT keyword FROM WordData)
-        #""")
+        #cursor.execute("SELECT user_id FROM Users WHERE user_id = 3")
         #print(cursor.fetchall())
 
 def is_word_data_initialized():
@@ -162,7 +186,6 @@ def clear_word_data_table():
         CREATE INDEX index_keyword_cumulative_weight ON WordData(keyword, cumulative_weight);
         """)#We use an index to order the items for faster querying, since its a cumulative weight for choosing a specific word
         
-
 def add_word_data_rows(rows):
     with get_db_cursor(commit=True) as cursor:
         #i dont know why, but i had to add IGNORE because it said some of the input data was duplicated
@@ -242,3 +265,88 @@ def signup(username, email, password):
         return False, None
     else:
         return login(username, password)#We need to keep this outside the with-block so our INSERT can be commited
+
+def create_new_chat(auth_token):
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        INSERT INTO Chats (user_id, creation_date)
+        SELECT u.user_id, NOW() FROM Users u
+        INNER JOIN Sessions s ON u.user_id = s.user_id
+        WHERE %s = s.auth_token_hash
+        """, (HashManager.hash_auth_token(auth_token),))
+        return cursor.lastrowid
+
+def create_new_message(chat_id, message, auth_token): #Missing auth_token means it was the bot who sent it
+    with get_db_cursor(commit=True) as cursor:
+        sender_id = 1
+        if auth_token != "":
+            cursor.execute("""
+            SELECT user_id FROM Sessions WHERE auth_token_hash = %s
+            """, (HashManager.hash_auth_token(auth_token),))
+            sender_id = cursor.fetchone()[0]
+        cursor.execute("""
+        INSERT INTO Message (chat_id, sender_id, message, creation_date)
+        VALUES (%s, %s, %s, NOW())
+        """, (chat_id, sender_id, message))
+
+def get_chat_history(chat_id, auth_token):
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+        SELECT m.sender_id, m.message FROM Message m 
+        INNER JOIN Chats c ON m.chat_id = c.chat_id
+        INNER JOIN Users u ON c.user_id = u.user_id
+        INNER JOIN Sessions s ON s.user_id = u.user_id
+        WHERE s.auth_token_hash = %s
+        AND m.chat_id = %s
+        ORDER BY m.creation_date ASC
+        """, (HashManager.hash_auth_token(auth_token), chat_id))
+
+        return cursor.fetchall()
+
+def get_chats(auth_token):
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+        SELECT chat_id FROM Chats c
+        INNER JOIN Sessions s ON c.user_id = s.user_id
+        WHERE s.auth_token_hash = %s
+        ORDER BY c.creation_date DESC
+        """, (HashManager.hash_auth_token(auth_token),))
+        return cursor.fetchall()
+
+def get_word_database_stats():
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+        SELECT keyword, COUNT(*) FROM WordData
+        GROUP BY keyword
+        HAVING COUNT(*) > 10
+        ORDER BY COUNT(*) DESC
+        """)
+
+        return cursor.fetchall()
+
+def get_word_stats(word):
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+        SELECT * FROM WordData
+        WHERE keyword = BINARY %s
+        ORDER BY cumulative_weight
+        """, (word,))
+
+        return cursor.fetchall()
+
+def get_user_stats():
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+        SELECT * FROM Users
+        """)
+
+        users = cursor.fetchall()
+
+        cursor.execute("""
+        SELECT u.username, s.auth_token_hash, s.expiry_date FROM Sessions s
+        INNER JOIN Users u ON s.user_id = u.user_id
+        """)
+
+        sessions = cursor.fetchall()
+
+        return users, sessions

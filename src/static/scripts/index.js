@@ -69,6 +69,46 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
+async function fetch_chats() {
+    await fetch("/chats", {
+    method: "GET",
+    headers: {"Content-Type": "application/json"}
+    }).then(response => response.json())
+    .then(chats => {
+        chats.forEach(chat => {
+        let main_div = document.getElementById("chat_history");
+        let chat_elem = document.createElement("div");
+        chat_elem.classList.add("chat");
+        chat_elem.innerText = "Chat: " + chat;
+        main_div.appendChild(chat_elem);
+
+        chat_elem.onclick = async() => {
+            await fetch("/history", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({chat_id: chat})
+            }).then(response => response.json())
+            .then(messages => {
+                console.log(messages);
+                let div = document.getElementById("messages");
+                div.replaceChildren();
+                messages.forEach(message => {
+                    let message_div = document.createElement("div");
+                    if(message[0] == 1) {
+                        message_div.classList.add("message","bot");
+                    } else {
+                        message_div.classList.add("message","user");
+                    }
+                    document.getElementById("messages").appendChild(message_div);
+                    let message_p = document.createElement("p");
+                    message_p.innerHTML = message[1];
+                    message_div.appendChild(message_p);
+                });
+            });
+        }
+        });    
+    });
+}
 let is_query_running = false;
 let current_result = "";
 function start_query() { //Not nicely done. Probably a lot of security vulnerabilities :(
@@ -93,13 +133,6 @@ function start_query() { //Not nicely done. Probably a lot of security vulnerabi
 
     
     const source = new EventSource("/query?q=" + encodeURIComponent(query.value));
-
-    /*fetch("/query", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({query: query.value})
-    });*/
-
     query.value = "";
     source.onmessage = (event) => {
         if(event.data === "[DONE]") {

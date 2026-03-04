@@ -3,20 +3,17 @@ import random
 import time
 
 # https://github.com/pgcorpus/gutenberg/
-def predict_next_words(query):
+def predict_next_words(query, chat_id):
     max_num_sentences = 1
     split_row_chance = 40
     current_num_sentences = 0
     new_sentence = " " + query
+    final_message = ""
     hit_dot = False
     while True:
         if hit_dot == True:
             break
-        start = time.perf_counter()
         word = DBManager.predict_next_word(new_sentence.split(" ")[-1])
-        end = time.perf_counter()
-        if (end - start) * 1000 > 100:
-            print(new_sentence.split(" ")[-1])
         if word is None:
             continue
         word = word.strip()
@@ -28,8 +25,10 @@ def predict_next_words(query):
             if random.randint(1,max_num_sentences) < current_num_sentences:
                 hit_dot = True
         new_sentence += " " + word
+        final_message += ' ' + word + breakline
         yield f"data: {' ' + word + breakline}\n\n"
         time.sleep(0.01)
+    DBManager.create_new_message(chat_id, final_message, "")
     yield "data: [DONE]\n\n"
 
 def train_if_not_initialized():

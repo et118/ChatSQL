@@ -14,7 +14,9 @@ def hash_password(string: str):
     return hash.decode("utf-8")
 
 def verify_hashed_password(password, password_hash):
-    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
-
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except Exception:
+        return False
 def hash_auth_token(string):
     return hashlib.sha256(string.encode("utf-8")).hexdigest()

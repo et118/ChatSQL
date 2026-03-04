@@ -23,7 +23,42 @@ email_pattern = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
 
 @app.route("/")
 def index():
+    #Whenever we load main page, we dont have a chat selected
+    session.pop("chat_id", None)
     return render_template("index.html")
+
+@app.route("/stats")
+def stats():
+    if "auth_token" not in session:
+        return "You need to be logged in to view statistics", 400
+    return render_template("statistics.html")
+
+@app.route("/words_stats", methods=["GET"])
+def words_stats():
+    stats = DBManager.get_word_database_stats()
+    json = []
+    for word, amount in stats:
+        json.append([word,amount])
+    return json, 200
+
+@app.route("/word_stats", methods=["POST"])
+def word_stats():
+    stats = DBManager.get_word_stats(request.get_json()["word"])
+    json = []
+    for keyword, predict_word, count, cumulative_weight, total_weight in stats:
+        json.append([keyword, predict_word, count, cumulative_weight, total_weight])
+    return json, 200
+
+@app.route("/user_stats", methods=["GET"])
+def user_stats():
+    users, sessions  = DBManager.get_user_stats()
+    json = {"users":[], "sessions":[]}
+    for user_id, username, email, password_hash in users:
+        json["users"].append([user_id, username, email, password_hash])
+    for username, auth_token_hash, expiry_date in sessions:
+        json["sessions"].append([username, auth_token_hash, expiry_date])
+    return json
+    
 
 @app.before_request
 def expire_session_check():
@@ -45,6 +80,11 @@ def login():
     
     username = request.form["username"]
     password = request.form["password"]
+    
+    if len(username) == 0:
+        return "You can't use an empty username", 400
+    if len(password) == 0:
+        return "You can't use an empty password", 400
 
     #Check if already logged in (safety check incase we try to login while already logged in)
     if "auth_token" in session and DBManager.is_auth_token_valid(session["auth_token"], username):
@@ -114,8 +154,37 @@ def query():
     if not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
         return "Invalid session", 400
 
+    if "chat_id" not in session:
+        session["chat_id"] = DBManager.create_new_chat(session["auth_token"])
     query = request.args.get("q", "")
-    return Response(ChatManager.predict_next_words(query), mimetype="text/event-stream")
+    DBManager.create_new_message(session["chat_id"], query, session["auth_token"])
+    return Response(ChatManager.predict_next_words(query, session["chat_id"]), mimetype="text/event-stream")
+
+@app.route("/chats", methods=["GET"])
+def chats():
+    if "auth_token" not in session or "username" not in session:
+        return "Missing auth_token and/or username header", 400
+    if not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
+        return "Invalid session", 400
+
+    chats = DBManager.get_chats(session["auth_token"])
+    ret = []
+    for chat in chats:
+        ret.append(chat[0])
+    return ret, 200
+
+@app.route("/history", methods=["POST"])
+def history():
+    if "auth_token" not in session or "username" not in session:
+        return "Missing auth_token and/or username header", 400
+    if not DBManager.is_auth_token_valid(session["auth_token"], session["username"]):
+        return "Invalid session", 400
+    print(request.get_json())
+    chat_id = request.get_json()["chat_id"]
+    session["chat_id"] = chat_id
+    
+    messages = DBManager.get_chat_history(session["chat_id"], session["auth_token"])
+    return messages, 200
 
 if __name__ == "__main__": #Only gets run when manually running the python file outside the container
     app.run(debug=True, threaded=True, port=5000, host="0.0.0.0")
